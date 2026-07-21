@@ -3,6 +3,7 @@ from rclpy.node import Node
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 import cv2
+import numpy as np
 
 
 class ObstacleDetectorNode(Node):
@@ -23,32 +24,62 @@ class ObstacleDetectorNode(Node):
             10
         )
 
-        self.canny_low = 50
-        self.canny_high = 150
-        self.min_contour_area = 200
+        self.crop_x = 64
+        self.crop_y = 48
+        self.crop_w = 192
+        self.crop_h = 144
+
+        self.min_contour_area = 150
+        # Reject anything bigger than half the cropped frame -- that's almost
+        # certainly a merged background blob, not a single real obstacle.
+        self.max_contour_area = (self.crop_w * self.crop_h) // 2
+
+        self.morph_kernel = np.ones((3, 3), np.uint8)
 
         self.frame_count = 0
-        self.get_logger().info('obstacle_detector_node started')
+        self.get_logger().info('obstacle_detector_node started (fixed threshold=128 segmentation)')
 
     def image_callback(self, msg):
         cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         self.frame_count += 1
 
-        gray = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
+        cropped = cv_image[
+            self.crop_y:self.crop_y + self.crop_h,
+            self.crop_x:self.crop_x + self.crop_w
+        ]
+
+        gray = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
         blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-        edges = cv2.Canny(blurred, self.canny_low, self.canny_high)
+
+        # Otsu automatically finds the brightness cutoff that best separates
+        # two groups of pixels -- here, bright floor vs. darker obstacles.
+        # THRESH_BINARY_INV flags the darker group (obstacles) as foreground.
+        # Adaptive threshold: the floor gets darker toward the horizon due to
+        # perspective/lighting falloff, so a single global cutoff (tried above,
+        # failed) can't separate floor from obstacles everywhere in the frame.
+        # This computes a local cutoff per-region instead, following the
+        # brightness gradient. Block size 41 chosen to exceed typical object
+        # width (~30-50px) so each region compares an object against its true
+        # surroundings, not against itself.
+        thresh = cv2.adaptiveThreshold(
+            blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv2.THRESH_BINARY_INV, blockSize=41, C=10
+        )
+
+        # Clean up small speckle noise from the threshold step.
+        opened = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, self.morph_kernel)
 
         contours, _ = cv2.findContours(
-            edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+            opened, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
         )
 
         detections = 0
         for contour in contours:
             area = cv2.contourArea(contour)
-            if area < self.min_contour_area:
+            if area < self.min_contour_area or area > self.max_contour_area:
                 continue
             x, y, w, h = cv2.boundingRect(contour)
-            cv2.rectangle(cv_image, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            cv2.rectangle(cropped, (x, y), (x + w, y + h), (0, 255, 0), 2)
             detections += 1
 
         if self.frame_count % 30 == 1:
@@ -56,7 +87,7 @@ class ObstacleDetectorNode(Node):
                 f'Frame #{self.frame_count}: {detections} obstacle(s) detected'
             )
 
-        annotated_msg = self.bridge.cv2_to_imgmsg(cv_image, encoding='bgr8')
+        annotated_msg = self.bridge.cv2_to_imgmsg(cropped, encoding='bgr8')
         annotated_msg.header = msg.header
         self.publisher.publish(annotated_msg)
 
