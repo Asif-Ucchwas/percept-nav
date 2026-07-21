@@ -28,6 +28,7 @@ setup(
     entry_points={
         'console_scripts': [
             'camera_viewer_node = percept_nav.camera_viewer_node:main',
+            'obstacle_detector_node = percept_nav.obstacle_detector_node:main',
         ],
     },
 )
