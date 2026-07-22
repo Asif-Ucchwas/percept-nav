@@ -29,6 +29,7 @@ setup(
         'console_scripts': [
             'camera_viewer_node = percept_nav.camera_viewer_node:main',
             'obstacle_detector_node = percept_nav.obstacle_detector_node:main',
+            'sensor_fusion_node = percept_nav.sensor_fusion_node:main',
         ],
     },
 )

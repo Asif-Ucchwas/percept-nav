@@ -4,6 +4,7 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 import cv2
 import numpy as np
+from vision_msgs.msg import Detection2D, Detection2DArray, ObjectHypothesisWithPose
 
 
 class ObstacleDetectorNode(Node):
@@ -21,6 +22,12 @@ class ObstacleDetectorNode(Node):
         self.publisher = self.create_publisher(
             Image,
             '/camera/obstacle_detections',
+            10
+        )
+
+        self.detections_publisher = self.create_publisher(
+            Detection2DArray,
+            '/camera/detections_2d',
             10
         )
 
@@ -74,6 +81,9 @@ class ObstacleDetectorNode(Node):
         )
 
         detections = 0
+        detection_array = Detection2DArray()
+        detection_array.header = msg.header
+
         for contour in contours:
             area = cv2.contourArea(contour)
             if area < self.min_contour_area or area > self.max_contour_area:
@@ -81,6 +91,23 @@ class ObstacleDetectorNode(Node):
             x, y, w, h = cv2.boundingRect(contour)
             cv2.rectangle(cropped, (x, y), (x + w, y + h), (0, 255, 0), 2)
             detections += 1
+
+            det = Detection2D()
+            det.bbox.center.position.x = float(x + w / 2.0)
+            det.bbox.center.position.y = float(y + h / 2.0)
+            det.bbox.size_x = float(w)
+            det.bbox.size_y = float(h)
+
+            hyp = ObjectHypothesisWithPose()
+            hyp.hypothesis.class_id = 'obstacle'
+            # Classical CV gives no learned confidence score; 1.0 marks
+            # "detected", not a probability estimate (that's a deep-learning
+            # concept -- being honest about what this pipeline can and can't
+            # produce).
+            hyp.hypothesis.score = 1.0
+            det.results.append(hyp)
+
+            detection_array.detections.append(det)
 
         if self.frame_count % 30 == 1:
             self.get_logger().info(
@@ -90,6 +117,7 @@ class ObstacleDetectorNode(Node):
         annotated_msg = self.bridge.cv2_to_imgmsg(cropped, encoding='bgr8')
         annotated_msg.header = msg.header
         self.publisher.publish(annotated_msg)
+        self.detections_publisher.publish(detection_array)
 
 
 def main(args=None):

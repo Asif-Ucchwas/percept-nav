@@ -58,3 +58,35 @@ final answer.
 Key lesson: a technique failing isn't a coding mistake to patch with another
 parameter — it's a signal to ask what specific property of the scene the
 technique can't handle, then pick a technique that matches that property.
+
+## Task 4 — Camera + LiDAR sensor fusion (2026-07-22)
+- Added structured detection output: obstacle_detector_node now publishes
+  vision_msgs/Detection2DArray (industry-standard message type) alongside
+  the annotated debug image, instead of only drawing boxes on pixels.
+- Wrote sensor_fusion_node.py: uses message_filters.ApproximateTimeSynchronizer
+  to pair /scan (LiDAR) and /camera/detections_2d (camera) messages by
+  timestamp, then projects each in-FOV LiDAR point to a pixel column via
+  the pinhole camera model (focal length from FOV, angle->pixel formula),
+  and matches it against detected bounding boxes. Full math derivation
+  saved in docs/notes/sensor_fusion_math.md for reference/study.
+- This is a genuinely different fusion problem than the thesis's IMU
+  Kalman filter: that combined multiple estimates of the same quantity
+  for accuracy; this combines two different sensor modalities (2D image +
+  360 degree range) for completeness -- neither sensor alone gives both
+  "what is it" and "how far is it."
+- Verified working: stationary robot showed 6 detections, 5 consistently
+  matched to a LiDAR range (~1.9-2.0m, sensible for the test world).
+  Then drove the robot forward via teleop_keyboard and re-checked --
+  distances to obstacles in the driving direction dropped to ~0.86-0.91m
+  while off-axis obstacles stayed near their original distance, confirming
+  the fusion tracks real, per-obstacle distance as the robot moves (not
+  just repeating a static number).
+- Known limitation: 1 of 6 detections typically goes unmatched each frame,
+  likely at the edge of the camera's FOV where LiDAR's discrete angle
+  steps don't land precisely on that detection's pixel range. Acceptable
+  for a first working pipeline; the pinhole model is an approximation of
+  the real fisheye lens (documented in sensor_fusion_math.md).
+
+Stage 1 (Perception Foundation) complete: camera verified, OpenCV
+obstacle detection working, camera+LiDAR fusion verified with real
+robot motion.
