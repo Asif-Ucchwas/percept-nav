@@ -90,3 +90,43 @@ technique can't handle, then pick a technique that matches that property.
 Stage 1 (Perception Foundation) complete: camera verified, OpenCV
 obstacle detection working, camera+LiDAR fusion verified with real
 robot motion.
+
+## Task 5 — slam_toolbox setup (2026-07-22)
+- Already installed on this machine; copied mapper_params_online_async.yaml
+  into percept_nav/config/ rather than editing the system copy.
+- Found and fixed a real config mismatch: default max_laser_range (20.0m)
+  exceeded our actual LiDAR's range_max (3.5m, confirmed from /scan data
+  in Task 4). Set to 3.5 explicitly.
+- Hit a real gotcha: slam_toolbox's launch file argument is named
+  `slam_params_file`, not `params_file` -- passing the wrong name silently
+  falls back to the default config with no error, so our first "fix" wasn't
+  actually being applied. Caught by checking `ros2 param get` on the live
+  node instead of trusting the launch log alone.
+- Verified frame names (base_footprint -> odom) match the config without
+  changes needed.
+
+## Task 6 — Live SLAM mapping (2026-07-22)
+- Ran slam_toolbox live, generated a map from scratch (no pre-made map
+  loaded), confirmed growing map dimensions via /map_metadata as the robot
+  moved (80x102 -> 106x120 -> 141x120 -> 145x123 cells @ 5cm resolution).
+- First driving attempt (manual teleop) produced a very sparse map -- thin
+  traced lines, not filled regions. Root cause: driving traced a rough path
+  rather than sweeping open floor area.
+- Second attempt: wrote a scripted cmd_vel driver (timed forward/turn
+  sequence) for reproducibility instead of manual keyboard driving.
+  Result was still partial-coverage: several fan-shaped scan patterns
+  visible in the saved map, indicating the robot got stuck against
+  obstacles (world center has several cylinders) and rotated in place for
+  parts of the sequence, rather than translating through open space.
+- Real lesson: open-loop timed velocity commands don't verify whether
+  movement actually succeeds -- this is exactly why real navigation stacks
+  (Nav2, Stage 3) use closed-loop control with odometry/costmap feedback
+  instead of blind timed commands.
+- Accepted this as a partial-coverage map rather than re-attempting:
+  confirms slam_toolbox is correctly configured and produces accurate,
+  real-scale occupancy data (verified ~7m x 6m world scale, correct wall
+  edges visible), but full clean-room coverage would need either more
+  careful driving or closed-loop navigation to avoid stalling on obstacles.
+- Saved final map to docs/images/task6_map_presentable.png -- rendered
+  with matplotlib for a proper title, real-world axis scale in meters,
+  and clean colormap (vs. the raw PGM's grayscale/tiny default).
