@@ -172,3 +172,37 @@ robot motion.
 Stage 2 (SLAM Integration) complete: slam_toolbox installed and correctly
 configured, live mapping demonstrated and verified end-to-end (save +
 reload cycle working), key parameters documented with real reasoning.
+
+## Task 9 — Custom Nav2 costmap layer (2026-08-01)
+- Created a new C++ package (percept_nav_costmap_plugin, ament_cmake build
+  type) separate from the main percept_nav Python package -- Nav2 costmap
+  layers are C++ plugins loaded via pluginlib, a different toolchain than
+  everything built so far in this project.
+- Implemented DetectionLayer, inheriting from nav2_costmap_2d::CostmapLayer,
+  with the standard Layer interface: onInitialize() (subscribes to
+  /detected_obstacles from the Task 4 fusion node), updateBounds() and
+  updateCosts() (called every costmap cycle by Nav2), and reset().
+- Real bug hit on first build: referenced robot_x_/robot_y_ as class
+  members inside updateBounds()/updateCosts() without ever declaring or
+  populating them -- classic copy-paste-style naming mismatch. Compiler
+  caught it immediately (undeclared identifier). Fixed by adding the
+  members to the header and actually capturing the real robot_x/robot_y
+  parameters Nav2 passes into updateBounds() each cycle.
+- Honest scoping limitation, documented rather than hidden: the Task 4
+  fusion node stores a fused distance (pose.position.x) per detection but
+  does not yet compute each detection's true map-frame (x, y) position --
+  that would require combining distance with robot heading and the
+  detection's specific camera angle. For this first working version, the
+  layer marks a fixed-radius region around the robot's current position
+  whenever any valid fused detection exists, rather than placing each
+  detection at its precise real-world location. A complete implementation
+  is a natural follow-up, not attempted this pass to keep Task 9 scoped
+  to "wire the pipeline into Nav2 end-to-end" rather than perfect geometry.
+- Build succeeded on the second attempt (after the robot_x_/robot_y_ fix).
+  Verified the plugin actually installs correctly: compiled .so library,
+  installed plugin XML descriptor, and critically the
+  nav2_costmap_2d__pluginlib__plugin resource index entry that Nav2's
+  plugin loader scans to discover available Layer plugins by name --
+  confirms this is genuinely discoverable, not just compiled.
+- Integration test (actually running Nav2 with this layer active in its
+  costmap config) is planned for Task 11.

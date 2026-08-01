@@ -1,0 +1,8 @@
+<library path="percept_nav_costmap_plugin">
+  <class type="percept_nav_costmap_plugin::DetectionLayer" base_class_type="nav2_costmap_2d::Layer">
+    <description>
+      A costmap layer that marks obstacles based on fused camera+LiDAR
+      detections from the percept_nav perception pipeline.
+    </description>
+  </class>
+</library>
