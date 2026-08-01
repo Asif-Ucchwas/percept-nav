@@ -242,3 +242,37 @@ reload cycle working), key parameters documented with real reasoning.
   legitimate engineering skill -- not every problem is worth fully
   resolving before moving forward, especially when a reliable alternative
   exists that meets the actual requirement.
+
+## Task 11 — Verify Nav2 replanning around moving obstacle (2026-08-01)
+- Configured Nav2 with a custom nav2_params.yaml (base: turtlebot3_navigation2
+  burger_cam.yaml), adding detection_layer to the local_costmap plugins list
+  alongside obstacle_layer, voxel_layer, inflation_layer.
+- Used nav2_bringup's navigation_launch.py (not turtlebot3_navigation2's
+  wrapper, which defaults to a static map + AMCL + unconditional RViz --
+  incompatible with our already-running slam_toolbox and headless setup).
+- Confirmed our Task 9 plugin loads correctly in a live Nav2 stack: log
+  showed "Using plugin detection_layer" / "DetectionLayer initialized,
+  subscribing to /detected_obstacles" / "Initialized plugin detection_layer"
+  alongside the standard costmap layers. Full nav2 stack (controller,
+  planner, behavior_server, bt_navigator, etc.) configured and activated
+  cleanly via the lifecycle manager.
+- Sent a real NavigateToPose goal; confirmed genuine navigation via
+  steadily decreasing distance_remaining in the action feedback (0.90 ->
+  0.86 -> 0.85 -> 0.83 -> 0.75m) and real robot position updates matching.
+- Tested obstacle response: moved moving_obstacle_box (from Task 10)
+  directly into the robot's path mid-navigation via set_pose. Checked
+  /local_costmap/costmap immediately after -- showed near-lethal cost
+  values (95-100, out of 100 max) at cells corresponding to the obstacle's
+  new position, confirming real-time costmap awareness of the moved object.
+- Confirmed the planner remains active throughout: /plan topic showed a
+  live 6-waypoint path while the navigation goal continued running in the
+  background.
+- Honest limitation carried over from Task 9: the custom detection_layer
+  marks a fixed-radius region around the robot's own position for any
+  valid fused detection, rather than the detection's precise mapped
+  location -- so the near-lethal costmap values observed here are most
+  directly attributable to the standard obstacle_layer/voxel_layer (which
+  read raw LiDAR data and would detect the box regardless), with
+  detection_layer contributing additional marking whenever our fusion
+  pipeline has a valid detection. Precise per-detection placement in
+  detection_layer remains a documented follow-up, not this task's scope.
