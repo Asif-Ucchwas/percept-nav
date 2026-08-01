@@ -206,3 +206,39 @@ reload cycle working), key parameters documented with real reasoning.
   confirms this is genuinely discoverable, not just compiled.
 - Integration test (actually running Nav2 with this layer active in its
   costmap config) is planned for Task 11.
+
+## Task 10 — Moving obstacle in Gazebo (2026-08-01)
+- Built moving_box.sdf: a simple 0.3m red box with the gz-sim
+  VelocityControl system plugin attached, spawned live into the running
+  world via `gz service .../create` (data: true confirmed).
+- Attempted physics-based velocity control (the standard approach, per
+  Gazebo's own bundled velocity_control.sdf demo world). Extensive
+  troubleshooting: confirmed a real subscriber existed on the model's
+  cmd_vel topic, confirmed messages were reaching Gazebo (direct gz topic
+  publish, repeated publish loop, and a proper ROS2-bridged sustained
+  publisher via rclpy -- the same reliable pattern used successfully in
+  Task 6's drive_coverage.py). None produced real, controlled motion --
+  position drifted by only a few centimeters, inconsistent with commanded
+  direction. Also separately diagnosed and fixed a real environment issue
+  along the way: after ~13 hours of continuous uptime, Gazebo's
+  real_time_factor had collapsed to ~0.003 (over 300x slower than real
+  time) -- a full process restart fixed that specific problem, but did
+  not fix the VelocityControl issue, confirming they were two separate
+  problems, not one.
+- Root cause of the VelocityControl non-response was not conclusively
+  identified despite methodical elimination of the more likely causes
+  (message delivery, subscriber existence, sim speed). Rather than
+  continue debugging an increasingly obscure plugin-internals question,
+  pivoted to a simpler, more reliable approach.
+- Final approach: direct pose-teleportation via the /world/default/set_pose
+  service, called on a timer with a sine-wave oscillation (script:
+  scripts/move_obstacle_box.py). Verified working -- box moved a real,
+  substantial distance (0.92m -> 1.47m) over 2 seconds, matching the
+  commanded oscillation. This satisfies the task's actual requirement
+  ("simple actors or moving boxes") without depending on a physics
+  subsystem that would not cooperate in this environment.
+- Real lesson: knowing when to stop debugging a stubborn, poorly-understood
+  tool behavior and switch to a simpler working approach is itself a
+  legitimate engineering skill -- not every problem is worth fully
+  resolving before moving forward, especially when a reliable alternative
+  exists that meets the actual requirement.
