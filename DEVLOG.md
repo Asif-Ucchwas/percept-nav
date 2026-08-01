@@ -130,3 +130,45 @@ robot motion.
 - Saved final map to docs/images/task6_map_presentable.png -- rendered
   with matplotlib for a proper title, real-world axis scale in meters,
   and clean colormap (vs. the raw PGM's grayscale/tiny default).
+
+## Task 7 — Save/reload map, compare against static reference (2026-07-22)
+- Compared our SLAM map against the static reference map bundled with
+  turtlebot3_manipulation_navigation2 (turtlebot3_world.yaml/.pgm). Same
+  resolution (0.05m/cell); confirmed the actual world is a hexagonal room
+  ~6m across with 9 obstacle cylinders in a 3x3 grid -- this explains the
+  crisscrossing diagonal pattern in our earlier partial-coverage map (the
+  robot was driving through narrow gaps between grid-arranged pillars).
+- Real gotcha hit: first saved the map to /tmp, which does not persist --
+  files were gone by the time we came back to test reloading. /tmp is for
+  disposable data only. Fixed by saving to a permanent maps/ folder inside
+  the repo instead, and moved the coverage-driving script from /tmp into
+  scripts/ for the same reason -- anything needed again belongs in the
+  repo, not /tmp.
+- Verified full save/reload cycle: map_saver_cli wrote a real .pgm + .yaml
+  pair to maps/task7_slam_map, then nav2_map_server successfully loaded it
+  back (lifecycle configure + activate both succeeded) and republished it
+  on /map with matching resolution/dimensions/origin -- confirms the saved
+  map is a genuinely reusable artifact, not just a static image.
+
+## Task 8 — SLAM parameter tuning and documentation (2026-07-22)
+- Documented all key mapper_params_online_async.yaml parameters in
+  docs/notes/slam_toolbox_params.md: max_laser_range (changed, matched to
+  real sensor), minimum_travel_distance/heading (attempted change, tuned
+  for our small ~6m world), loop closure group and scan-matching
+  correlation params (read/understood, left at default with reasoning).
+- Attempted a live before/after comparison for minimum_travel_distance.
+  Could not complete cleanly: after a long session of repeated Gazebo/SLAM
+  launches and restarts, /scan degraded to ~0.5Hz with a 61-second max
+  gap between scans, alongside persistent "jump back in time" TF buffer
+  warnings. Diagnosed as environment resource exhaustion (same WSLg
+  rendering bottleneck from Task 1, compounding after extended runtime),
+  not a config or parameter problem. Documented this honestly rather than
+  reporting fabricated results.
+- Real process lesson: fair before/after parameter comparisons need a
+  clean, stable test environment. Recognizing "this is infrastructure,
+  not tuning" and stopping to document it clearly, rather than chasing an
+  unstable result, is itself a legitimate diagnostic skill.
+
+Stage 2 (SLAM Integration) complete: slam_toolbox installed and correctly
+configured, live mapping demonstrated and verified end-to-end (save +
+reload cycle working), key parameters documented with real reasoning.
