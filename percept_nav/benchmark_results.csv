@@ -1,0 +1,5 @@
+condition,trial,success,time_to_goal,path_length,collisions
+baseline,1,False,,0.02131735461364389,0
+static_obstacle,1,False,,0.02131735461364389,0
+single_moving,1,False,,,0
+multiple_moving,1,False,,0.25434767955396387,2070

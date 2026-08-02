@@ -313,3 +313,44 @@ reload cycle working), key parameters documented with real reasoning.
 - This result is itself useful benchmark data for Stage 4: establishes a
   documented lower bound ("handles up to 8 obstacles at 4x speed") rather
   than an assumed or untested capability claim.
+
+## Task 14 — Instrumented benchmark trial runner (in progress, 2026-08-01)
+- Wrote scripts/benchmark_trials.py: an rclpy-based trial runner executing
+  Task 13's protocol (4 conditions, using the NavigateToPose action client
+  directly rather than the ros2 CLI, subscribing to /odom, /plan for
+  path length, and tracking obstacle proximity for collision counting).
+- Multiple real bugs found and fixed during smoke testing (1-trial runs),
+  each confirmed with direct evidence before being accepted as fixed:
+  1. Initial success check only tested whether the action future resolved
+     (`.done()`), not the actual result status -- an aborted/rejected goal
+     resolving quickly was wrongly logged as success. Fixed by checking
+     the real GoalStatus (STATUS_SUCCEEDED == 4).
+  2. Attempted robot position reset via gz service set_pose (teleport).
+     This moves the robot in the physics engine but does NOT reset /odom
+     (wheel-encoder dead-reckoning has no way to know a teleport happened),
+     so Nav2's internal position tracking silently desynced from the
+     robot's real simulated position -- trials "succeeded" instantly
+     because Nav2 still thought it was near the goal from a prior test.
+     Fixed by replacing teleport with a real NavigateToPose call back to
+     the start pose between trials, keeping odometry consistent.
+  3. Chosen start pose (-2.0, -0.5) -- taken from the launch file's spawn
+     argument -- turned out to be outside the actual map/costmap bounds
+     once SLAM/localization was running; Nav2's planner rejected it every
+     time ("Goal Coordinates ... was outside bounds"), so the "return to
+     start" step silently failed and the robot never actually moved,
+     again producing false-instant "successes". Root-caused by reading
+     the actual Nav2 bt_navigator log line showing the robot's true
+     map-frame starting position was (0.00, -0.00), not the launch spawn
+     argument -- corrected START_X/START_Y to (0.0, 0.0).
+- After all three fixes, hit a new (likely final, and much more mundane)
+  issue: the 30-second trial timeout is too short for a genuine two-hop
+  round trip (return-to-start, then the real trial navigation) under this
+  environment's real-time-factor variability. Not yet fixed -- next
+  session should increase TRIAL_TIMEOUT (e.g. to 60s) and re-run the
+  1-trial-per-condition smoke test before scaling to the full 40 trials.
+- Deliberately stopped here rather than continue further live debugging:
+  this was already a long, productive diagnostic session (3 real bugs
+  found and fixed with concrete evidence each time), and pushing further
+  while fatigued risked introducing new mistakes rather than catching
+  them. Stopping at a clearly identified, well-understood next step is
+  itself the right call, not a failure to finish.
