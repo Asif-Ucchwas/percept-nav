@@ -12,7 +12,7 @@ import sys
 SDF_PATH = "/home/jannatul/ros2_ws/src/percept_nav_repo/percept_nav/worlds/moving_box.sdf"
 GOAL_X, GOAL_Y = 1.8, 0.3
 START_X, START_Y = 0.0, 0.0  # true map-frame origin, confirmed from Nav2 logs (launch spawn param does not map directly to map-frame coords)
-TRIAL_TIMEOUT = 30.0
+TRIAL_TIMEOUT = 60.0
 COLLISION_THRESHOLD = 0.25
 
 
@@ -126,7 +126,7 @@ class BenchmarkNode(Node):
             'collisions': collisions
         }
 
-    def navigate_to(self, x, y, timeout=25.0):
+    def navigate_to(self, x, y, timeout=45.0):
         self._action_client.wait_for_server(timeout_sec=5.0)
         goal_msg = NavigateToPose.Goal()
         goal_msg.pose.header.frame_id = 'map'

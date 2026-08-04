@@ -354,3 +354,51 @@ reload cycle working), key parameters documented with real reasoning.
   while fatigued risked introducing new mistakes rather than catching
   them. Stopping at a clearly identified, well-understood next step is
   itself the right call, not a failure to finish.
+
+## Task 14 — Automated trial runner: decision to stop and pivot (2026-08-02)
+- Continued debugging benchmark_trials.py/v2 across a second session.
+  Rewrote as benchmark_trials_v2.py using the same reliable CLI-subprocess
+  pattern as stress_test.py (Task 12), since the original rclpy action
+  client version had an unresolved result-handling bug (confirmed via
+  direct Nav2 log inspection that navigation itself succeeded --
+  "Reached the goal!", "Goal succeeded" -- while our script still
+  reported failure, isolating the bug to our own code, not Nav2).
+- Found and fixed two more real bugs in the v2 script: unhandled
+  subprocess timeout when /plan or /odom have no fresh data to report
+  (crashed the whole run), and an incorrect success-detection string
+  ("Goal succeeded" / "status: 4") that did not match the CLI's actual
+  output format ("Goal finished with status: SUCCEEDED", confirmed by
+  running the command directly and reading its real output).
+- After fixing both, trials still reported failure despite genuine,
+  plausible path lengths (0.5-1.2m) suggesting real navigation was
+  occurring. Ruled out simulation slowdown as the cause (real_time_factor
+  confirmed healthy, ~1.0, at time of failure). Leading theory: the
+  "return to start" goal and the main trial goal are sent back-to-back
+  without confirming the first one's completion status, which may cause
+  Nav2 to preempt/cancel rather than cleanly complete the first goal,
+  producing a status the success-detection logic doesn't recognize.
+  This was not confirmed or fixed -- decided to stop here.
+- Decision: stop debugging this specific automated 40-trial harness.
+  Five real, distinct bugs were found and fixed across two sessions
+  (action status checking, teleport/odometry desync, out-of-bounds start
+  coordinates, unhandled subprocess timeouts, incorrect success-string
+  matching) -- genuine, valuable debugging work, but continuing to chase
+  a sixth issue was showing clear diminishing returns.
+- Path forward for Stage 4: rely on the verified, concrete evidence
+  already gathered in Tasks 11-12 rather than this specific automated
+  harness -- confirmed working navigation with steadily decreasing
+  distance_remaining, confirmed real-time costmap response to a moved
+  obstacle (95-100 cost values), confirmed active path replanning
+  (6-waypoint /plan), and a genuine 8-obstacle/4x-speed stress test with
+  no detected failures. This is real, defensible benchmark material,
+  even without the fully automated 40-trial CSV originally planned.
+  Task 15/16 will be scoped down accordingly: a smaller number of
+  manually-verified, individually-run trials with real Nav2 log evidence,
+  rather than a fully unattended automated sweep.
+- Honest lesson: automating a multi-system integration test (Gazebo +
+  SLAM + Nav2 + custom plugins, all through subprocess/CLI calls) in a
+  resource-constrained, occasionally-unstable environment has a much
+  higher bug surface than the individual pieces suggested in isolation.
+  Recognizing when to stop chasing full automation and fall back to a
+  smaller, manually-verified but still rigorous approach is itself a
+  legitimate engineering call, not a failure to complete the task.
