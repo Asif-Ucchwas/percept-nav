@@ -18,8 +18,8 @@ setup(
     zip_safe=True,
     maintainer='jannatul',
     maintainer_email='asifuzzamanucchwas@gmail.com',
-    description='TODO: Package description',
-    license='TODO: License declaration',
+    description='Real-time multi-sensor SLAM and dynamic obstacle navigation stack -- ROS2 Jazzy, Gazebo Harmonic, TurtleBot3',
+    license='MIT',
     extras_require={
         'test': [
             'pytest',

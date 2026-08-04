@@ -3,9 +3,9 @@
 <package format="3">
   <name>percept_nav_costmap_plugin</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
+  <description>Custom Nav2 costmap layer plugin that fuses camera-based obstacle detections into the costmap, part of the Percept-Nav perception pipeline</description>
   <maintainer email="asifuzzamanucchwas@gmail.com">jannatul</maintainer>
-  <license>TODO: License declaration</license>
+  <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
