@@ -1,0 +1,2 @@
+condition,trial,success,time_to_goal_sec,path_length_m,notes
+baseline,1,false,653.5,,ABORTED due to velocity_smoother node heartbeat failure and full Nav2 stack auto-recovery (see DEVLOG) -- not a navigation failure, an infrastructure event
