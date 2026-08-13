@@ -1,0 +1,6 @@
+build/
+install/
+log/
+*.gcda
+*.gcno
+coverage*.info
