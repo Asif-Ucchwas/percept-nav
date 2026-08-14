@@ -66,6 +66,33 @@ ros2 launch slam_toolbox online_async_launch.py slam_params_file:=src/percept_na
 ros2 launch nav2_bringup navigation_launch.py params_file:=src/percept_nav_repo/percept_nav/config/nav2_params.yaml use_sim_time:=true
 ```
 
+## Testing & Build
+
+**Coverage:** `percept_nav_costmap_plugin` (C++) has 5 gtest tests
+covering every public method of `DetectionLayer` with a real
+`LayeredCostmap` fixture, not mocks - documented qualitatively rather
+than by percentage after `lcov` 2.0 gave internally contradictory
+coverage numbers on this same file (see DEVLOG.md's coverage snapshot
+entry for the full explanation). The `percept_nav` Python package has
+no unit tests currently; its nodes are ROS2 integration points
+(camera/LiDAR/SLAM/Nav2 glue) verified via live simulation runs
+documented in `docs/notes/`.
+
+**Run tests:**
+```bash
+colcon build --packages-select percept_nav_costmap_plugin --cmake-args -DBUILD_TESTING=ON
+./build/percept_nav_costmap_plugin/test_detection_layer
+```
+
+**CI:** no GitHub Actions workflow in this repo currently - CI was set
+up on CAN-Net as the DevOps-Rigor Task 12 proof of concept.
+
+**Build clean:** both packages verified building clean from a genuinely
+fresh clone (fresh `rosdep check`, fresh `colcon build`, all 5 gtest
+cases passing) as part of the DevOps-Rigor Stage 2 build-system audit -
+see `percept_nav/docs/notes/build_system.md` for the full verification
+sequence and two real bugs found and fixed along the way (undeclared
+`package.xml` dependencies, a stale `CMakeCache.txt` interpreter path).
 
 ## Results
 
