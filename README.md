@@ -1,4 +1,7 @@
-# Percept-Nav: Real-Time Multi-Sensor SLAM & Dynamic Obstacle Navigation Stack
+# Percept-Nav
+
+![banner](assets/banner-percept-nav.png)
+: Real-Time Multi-Sensor SLAM & Dynamic Obstacle Navigation Stack
 
 A ROS2 Jazzy + Gazebo Harmonic robotics perception and navigation
 pipeline built on a TurtleBot3, combining classical computer vision,
