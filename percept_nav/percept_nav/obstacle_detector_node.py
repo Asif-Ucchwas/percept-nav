@@ -1,7 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
-from cv_bridge import CvBridge
+from cv_bridge import CvBridge, CvBridgeError
 import cv2
 import numpy as np
 from vision_msgs.msg import Detection2D, Detection2DArray, ObjectHypothesisWithPose
@@ -31,12 +31,26 @@ class ObstacleDetectorNode(Node):
             10
         )
 
-        self.crop_x = 64
-        self.crop_y = 48
-        self.crop_w = 192
-        self.crop_h = 144
+        # Declared as ROS2 parameters (not hardcoded) so they can be
+        # overridden at launch time via a params YAML or --ros-args -p,
+        # without editing code -- e.g. a different camera resolution or
+        # lighting condition needs different crop/threshold values.
+        self.declare_parameter('crop_x', 64)
+        self.declare_parameter('crop_y', 48)
+        self.declare_parameter('crop_w', 192)
+        self.declare_parameter('crop_h', 144)
+        self.declare_parameter('min_contour_area', 150)
+        self.declare_parameter('adaptive_threshold_block_size', 41)
+        self.declare_parameter('adaptive_threshold_c', 10)
 
-        self.min_contour_area = 150
+        self.crop_x = self.get_parameter('crop_x').value
+        self.crop_y = self.get_parameter('crop_y').value
+        self.crop_w = self.get_parameter('crop_w').value
+        self.crop_h = self.get_parameter('crop_h').value
+        self.min_contour_area = self.get_parameter('min_contour_area').value
+        self.threshold_block_size = self.get_parameter('adaptive_threshold_block_size').value
+        self.threshold_c = self.get_parameter('adaptive_threshold_c').value
+
         # Reject anything bigger than half the cropped frame -- that's almost
         # certainly a merged background blob, not a single real obstacle.
         self.max_contour_area = (self.crop_w * self.crop_h) // 2
@@ -44,11 +58,29 @@ class ObstacleDetectorNode(Node):
         self.morph_kernel = np.ones((3, 3), np.uint8)
 
         self.frame_count = 0
-        self.get_logger().info('obstacle_detector_node started (fixed threshold=128 segmentation)')
+        self.get_logger().info(
+            f'obstacle_detector_node started '
+            f'(crop=({self.crop_x},{self.crop_y},{self.crop_w},{self.crop_h}), '
+            f'min_contour_area={self.min_contour_area})'
+        )
 
     def image_callback(self, msg):
-        cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+        try:
+            cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+        except CvBridgeError as e:
+            self.get_logger().error(f'Failed to convert image message: {e}. Skipping frame.')
+            return
+
         self.frame_count += 1
+
+        img_h, img_w = cv_image.shape[:2]
+        if (self.crop_y + self.crop_h > img_h) or (self.crop_x + self.crop_w > img_w):
+            self.get_logger().warn(
+                f'Crop region ({self.crop_x},{self.crop_y},{self.crop_w},{self.crop_h}) '
+                f'exceeds incoming image size ({img_w}x{img_h}). Skipping frame -- check the '
+                f'crop_x/crop_y/crop_w/crop_h parameters against the actual camera resolution.'
+            )
+            return
 
         cropped = cv_image[
             self.crop_y:self.crop_y + self.crop_h,
@@ -70,7 +102,7 @@ class ObstacleDetectorNode(Node):
         # surroundings, not against itself.
         thresh = cv2.adaptiveThreshold(
             blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-            cv2.THRESH_BINARY_INV, blockSize=41, C=10
+            cv2.THRESH_BINARY_INV, blockSize=self.threshold_block_size, C=self.threshold_c
         )
 
         # Clean up small speckle noise from the threshold step.

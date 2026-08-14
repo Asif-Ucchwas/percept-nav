@@ -442,3 +442,44 @@ reload cycle working), key parameters documented with real reasoning.
   with concrete log evidence for every claim -- consistent with this
   project's stated principle of honest documentation over polished but
   unverified numbers.
+
+## DevOps-Rigor Stage 3 — Production-Grade Practices (Tasks 9-11)
+
+Hardened obstacle_detector_node.py, covering all three tasks:
+
+- Structured logging: already used self.get_logger() throughout (ROS2
+  convention) rather than print() - no change needed there. Updated
+  the startup log message to reflect actual runtime parameter values
+  instead of a stale hardcoded description.
+- Error handling: image_callback previously had zero error handling -
+  self.bridge.imgmsg_to_cv2() could throw an unhandled CvBridgeError
+  on an encoding mismatch, and the crop region was blindly sliced from
+  the incoming image with no bounds check, silently producing a
+  smaller-than-expected crop (or worse) if the camera published a
+  different resolution than assumed. Both now caught: a CvBridgeError
+  logs an error and skips the frame; a crop region that would exceed
+  the actual incoming image size logs a warning (naming the exact
+  mismatch) and skips the frame, rather than either crashing or
+  silently processing garbage.
+- Config externalization: crop_x/crop_y/crop_w/crop_h,
+  min_contour_area, and the adaptive-threshold block_size/C were
+  hardcoded instance attributes - now declared as real ROS2 parameters
+  via declare_parameter/get_parameter, the idiomatic ROS2 mechanism
+  for this (overridable via a launch-time params YAML or
+  --ros-args -p, not an env var, since this is a ROS2 node).
+
+Verified end-to-end, not just that it doesn't crash: constructed the
+node directly (not just import) and confirmed every parameter value
+matches the original hardcoded defaults exactly (crop 64/48/192/144,
+min_contour_area 150, threshold block_size/C 41/10). Also verified a
+real override works: rclpy.init(args=['--ros-args', '-p',
+'min_contour_area:=999']) actually produces min_contour_area=999 on
+the constructed node, not just an unused declared default.
+
+Hit a real environment gotcha while verifying: an old scratch clone
+from an earlier Task 6 clean-build test (~/clean_build_test) had left
+its install/ path prepended in this shell's PYTHONPATH, causing Python
+to silently import that stale, unedited copy of this file instead of
+the real one in ~/ros2_ws - confirmed by checking module.__file__
+directly rather than trusting the import succeeded. Fixed with
+`unset PYTHONPATH` before re-sourcing ros2_ws's own setup.bash.
